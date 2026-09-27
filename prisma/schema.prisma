@@ -1,0 +1,733 @@
+// EcoRoute Prisma Schema
+// Production-quality normalized PostgreSQL schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== AUTH & USER ====================
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  mobile         String?  @unique
+  passwordHash   String
+  name           String
+  avatarUrl      String?
+  isVerified     Boolean  @default(false)
+  mobileVerified Boolean  @default(false)
+  role           String   @default("user")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  profile            Profile?
+  savedLocations     SavedLocation[]
+  travelPreferences  TravelPreference?
+  emergencyContacts  EmergencyContact[]
+  journeys           Journey[]
+  expenses           Expense[]
+  tickets            Ticket[]
+  bookings           Booking[]
+  payments           Payment[]
+  cabBookings        CabBooking[]
+  liveTrips          LiveTrip[]
+  communityReports   CommunityReport[]
+  civicComplaints    CivicComplaint[]
+  notifications      Notification[]
+  achievements       Achievement[]
+  ecoStreaks         EcoStreak[]
+  userAnalytics      UserAnalytics[]
+  co2Records         CO2Record[]
+  reimbursements     Reimbursement[]
+
+  @@index([email])
+  @@index([mobile])
+}
+
+model Profile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  bio         String?
+  homeAddress String?
+  workAddress String?
+  collegeAddress String?
+  city        String?  @default("Delhi")
+  state       String?  @default("Delhi")
+  pincode     String?
+  dob         String?
+  gender      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model EmergencyContact {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  relationship String
+  phone        String
+  email        String?
+  isPrimary    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model SavedLocation {
+  id        String   @id @default(cuid())
+  userId    String
+  label     String   // "Home", "Work", "College", or custom
+  name      String
+  address   String
+  lat       Float
+  lng       Float
+  icon      String?
+  isFavourite Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model TravelPreference {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  preferredMode       String   @default("Metro")
+  maxWalkingMinutes   Int      @default(15)
+  maxBudgetPerDay     Float    @default(200)
+  ecoPreference       Boolean  @default(true)
+  accessibilityMode   Boolean  @default(false)
+  avoidTolls          Boolean  @default(false)
+  avoidHighways       Boolean  @default(false)
+  wheelchairAccess    Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ==================== JOURNEY & ROUTING ====================
+
+model Journey {
+  id              String   @id @default(cuid())
+  userId          String
+  status          String   @default("planned") // planned | active | completed | cancelled
+  originName      String
+  originLat       Float
+  originLng       Float
+  destName        String
+  destLat         Float
+  destLng         Float
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  totalDistanceKm Float?
+  totalDurationMin Int?
+  totalFare       Float?
+  totalCo2Kg      Float?
+  selectedMode    String?
+  notes           String?
+  isRecurring     Boolean  @default(false)
+  recurringDays   String?  // JSON array of days
+  recurringTime   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  segments        JourneySegment[]
+  routes          Route[]
+  expenses        Expense[]
+  tickets         Ticket[]
+  co2Records      CO2Record[]
+  liveTrip        LiveTrip?
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model JourneySegment {
+  id          String   @id @default(cuid())
+  journeyId   String
+  segmentOrder Int
+  mode        String   // Metro | Bus | Walk | Cab | Auto | Bike | Car
+  fromName    String
+  fromLat     Float
+  fromLng     Float
+  toName      String
+  toLat       Float
+  toLng       Float
+  durationMin Int
+  distanceKm  Float
+  fare        Float?
+  lineOrRoute String?
+  instructions String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  journey     Journey  @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+
+  @@index([journeyId])
+}
+
+model Route {
+  id              String   @id @default(cuid())
+  journeyId       String?
+  userId          String?
+  label           String   // "Fastest", "Cheapest", "Lower Emission", etc.
+  mode            String
+  totalDurationMin Int
+  totalDistanceKm Float
+  totalFare       Float
+  co2Kg           Float
+  walkingMinutes  Int
+  transfers       Int
+  trafficLevel    String?  // low | medium | high
+  weatherImpact   String?
+  accessibilityScore Int?  @default(0)
+  isSelected      Boolean  @default(false)
+  isSaved         Boolean  @default(false)
+  routePolyline   String?  // encoded polyline JSON
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  journey         Journey? @relation(fields: [journeyId], references: [id])
+  routeOptions    RouteOption[]
+
+  @@index([journeyId])
+  @@index([userId])
+}
+
+model RouteOption {
+  id          String   @id @default(cuid())
+  routeId     String
+  stepOrder   Int
+  mode        String
+  instruction String
+  durationMin Int
+  distanceKm  Float
+  fromName    String
+  toName      String
+  lineInfo    String?
+  createdAt   DateTime @default(now())
+
+  route       Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@index([routeId])
+}
+
+// ==================== VEHICLES ====================
+
+model Vehicle {
+  id          String   @id @default(cuid())
+  userId      String?
+  name        String
+  type        String   // Car | Bike | EV | Auto
+  make        String?
+  model       String?
+  year        Int?
+  fuelType    String?  // Petrol | Diesel | CNG | Electric
+  fuelEfficiency Float? // km/L or km/kWh
+  registrationNo String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ==================== EXPENSES ====================
+
+model Expense {
+  id              String   @id @default(cuid())
+  userId          String
+  journeyId       String?
+  category        String   // Transport | Fuel | Toll | Parking | Food | Other
+  subCategory     String?
+  title           String
+  estimatedAmount Float?
+  actualAmount    Float?
+  currency        String   @default("INR")
+  date            DateTime @default(now())
+  isReimbursable  Boolean  @default(false)
+  reimbursementId String?
+  notes           String?
+  receiptId       String?
+  paymentMethod   String?
+  vendor          String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  journey         Journey? @relation(fields: [journeyId], references: [id])
+  receipt         Receipt? @relation(fields: [receiptId], references: [id])
+  reimbursement   Reimbursement? @relation(fields: [reimbursementId], references: [id])
+
+  @@index([userId])
+  @@index([journeyId])
+  @@index([date])
+}
+
+model Receipt {
+  id          String   @id @default(cuid())
+  userId      String?
+  fileName    String
+  fileUrl     String?
+  fileType    String?
+  ocrResultId String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  expenses    Expense[]
+  ocrResult   OCRResult? @relation(fields: [ocrResultId], references: [id])
+
+  @@index([userId])
+}
+
+model OCRResult {
+  id          String   @id @default(cuid())
+  receiptId   String?  @unique
+  rawText     String?
+  amount      Float?
+  date        String?
+  vendor      String?
+  bookingId   String?
+  taxAmount   Float?
+  category    String?
+  confidence  Float?
+  status      String   @default("pending") // pending | success | needs_review | failed
+  isConfirmed Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  receipt     Receipt?
+}
+
+model Reimbursement {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  totalAmount Float
+  status      String   @default("pending") // pending | submitted | approved | rejected | paid
+  submittedAt DateTime?
+  approvedAt  DateTime?
+  paidAt      DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses    Expense[]
+
+  @@index([userId])
+}
+
+// ==================== TICKETS & BOOKINGS ====================
+
+model Ticket {
+  id           String   @id @default(cuid())
+  userId       String
+  journeyId    String?
+  bookingId    String?
+  ticketType   String   // Metro | Bus | Train | Demo
+  operator     String   // DMRC | DTC | etc.
+  fromStation  String
+  toStation    String
+  passengerCount Int    @default(1)
+  fare         Float
+  qrCode       String?
+  ticketNumber String   @unique
+  status       String   @default("active") // active | used | cancelled | expired
+  validFrom    DateTime
+  validUntil   DateTime
+  isDemo       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  journey      Journey? @relation(fields: [journeyId], references: [id])
+  passengers   Passenger[]
+  booking      Booking? @relation(fields: [bookingId], references: [id])
+
+  @@index([userId])
+  @@index([journeyId])
+  @@index([status])
+}
+
+model Passenger {
+  id         String   @id @default(cuid())
+  ticketId   String
+  name       String
+  age        Int?
+  type       String   @default("Adult") // Adult | Senior | Child | Student
+  idType     String?
+  idNumber   String?
+  createdAt  DateTime @default(now())
+
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model Booking {
+  id           String   @id @default(cuid())
+  userId       String
+  bookingType  String   // Metro | Bus | Cab | Auto | Demo
+  bookingRef   String   @unique
+  status       String   @default("pending") // pending | confirmed | cancelled | completed
+  provider     String
+  fromName     String
+  toName       String
+  scheduledAt  DateTime?
+  amount       Float
+  paymentId    String?
+  isDemo       Boolean  @default(true)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment      Payment? @relation(fields: [paymentId], references: [id])
+  tickets      Ticket[]
+  cabBooking   CabBooking?
+
+  @@index([userId])
+  @@index([bookingRef])
+}
+
+// ==================== PAYMENTS ====================
+
+model Payment {
+  id             String   @id @default(cuid())
+  userId         String
+  amount         Float
+  currency       String   @default("INR")
+  method         String   // UPI | Card | Net Banking
+  gateway        String?  @default("Razorpay Sandbox")
+  gatewayRef     String?
+  transactionId  String   @unique
+  receiptNumber  String?
+  status         String   @default("pending") // pending | success | failed
+  paidAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings       Booking[]
+  transactions   Transaction[]
+
+  @@index([userId])
+  @@index([transactionId])
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  paymentId   String
+  type        String   // debit | credit | refund
+  amount      Float
+  description String?
+  createdAt   DateTime @default(now())
+
+  payment     Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+}
+
+// ==================== CAB ====================
+
+model CabBooking {
+  id           String   @id @default(cuid())
+  userId       String
+  bookingId    String   @unique
+  provider     String   // Ola | Uber | BluSmart | Rapido | Demo
+  vehicleType  String   // Auto | Mini | Sedan | SUV | EV
+  driverName   String?
+  driverPhone  String?
+  vehicleNo    String?
+  fromAddress  String
+  toAddress    String
+  estimatedFare Float
+  actualFare   Float?
+  estimatedEta Int?     // minutes
+  status       String   @default("pending")
+  isDemo       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking      Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ==================== LIVE TRIP ====================
+
+model LiveTrip {
+  id              String   @id @default(cuid())
+  userId          String
+  journeyId       String?  @unique
+  shareToken      String   @unique @default(cuid())
+  isActive        Boolean  @default(true)
+  expiresAt       DateTime
+  destinationName String?
+  currentLat      Float?
+  currentLng      Float?
+  eta             String?
+  status          String   @default("sharing") // sharing | completed | stopped
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  journey         Journey? @relation(fields: [journeyId], references: [id])
+  locations       LiveLocation[]
+
+  @@index([userId])
+  @@index([shareToken])
+}
+
+model LiveLocation {
+  id         String   @id @default(cuid())
+  liveTripId String
+  lat        Float
+  lng        Float
+  accuracy   Float?
+  heading    Float?
+  speed      Float?
+  recordedAt DateTime @default(now())
+
+  liveTrip   LiveTrip @relation(fields: [liveTripId], references: [id], onDelete: Cascade)
+
+  @@index([liveTripId])
+  @@index([recordedAt])
+}
+
+// ==================== COMMUNITY ====================
+
+model CommunityReport {
+  id          String   @id @default(cuid())
+  userId      String
+  category    String   // Pothole | Waterlogging | Construction | Accident | Signal | Closure | Streetlight
+  title       String
+  description String
+  address     String
+  lat         Float
+  lng         Float
+  photoUrl    String?
+  severity    String   @default("medium") // low | medium | high | critical
+  status      String   @default("open") // open | acknowledged | resolved
+  upvotes     Int      @default(0)
+  views       Int      @default(0)
+  isVerified  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  confirmations   ReportConfirmation[]
+  comments        ReportComment[]
+
+  @@index([userId])
+  @@index([category])
+  @@index([lat, lng])
+  @@index([createdAt])
+}
+
+model ReportConfirmation {
+  id        String   @id @default(cuid())
+  reportId  String
+  userId    String?
+  type      String   @default("confirm") // confirm | deny
+  createdAt DateTime @default(now())
+
+  report    CommunityReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+}
+
+model ReportComment {
+  id        String   @id @default(cuid())
+  reportId  String
+  userId    String?
+  userName  String?
+  text      String
+  createdAt DateTime @default(now())
+
+  report    CommunityReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+}
+
+// ==================== CIVIC ====================
+
+model CivicComplaint {
+  id            String   @id @default(cuid())
+  userId        String
+  reportId      String?
+  category      String
+  title         String
+  description   String
+  address       String
+  lat           Float?
+  lng           Float?
+  photoUrl      String?
+  department    String?
+  draftText     String?
+  referenceNo   String?  @unique
+  status        String   @default("draft") // draft | user_approved | submitted | acknowledged | resolved
+  portalUrl     String?
+  submittedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ==================== NOTIFICATIONS ====================
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String   // traffic | transit | weather | hazard | booking | emergency | system
+  title       String
+  message     String
+  isRead      Boolean  @default(false)
+  isCritical  Boolean  @default(false)
+  actionUrl   String?
+  metadata    String?  // JSON
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model Alert {
+  id          String   @id @default(cuid())
+  type        String   // traffic | weather | metro | bus | emergency | civic
+  title       String
+  message     String
+  severity    String   @default("info") // info | warning | critical
+  area        String?
+  lat         Float?
+  lng         Float?
+  radius      Float?   // km
+  validFrom   DateTime @default(now())
+  validUntil  DateTime?
+  source      String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@index([type])
+  @@index([isActive])
+}
+
+// ==================== WEATHER ====================
+
+model WeatherRecord {
+  id              String   @id @default(cuid())
+  city            String
+  temperature     Float
+  feelsLike       Float?
+  humidity        Int?
+  condition       String
+  conditionCode   String?
+  windSpeed       Float?
+  rainMm          Float?
+  visibility      Float?
+  aqi             Int?
+  isRaining       Boolean  @default(false)
+  hasAlert        Boolean  @default(false)
+  alertMessage    String?
+  recordedAt      DateTime @default(now())
+
+  @@index([city])
+  @@index([recordedAt])
+}
+
+// ==================== ECO / CO2 ====================
+
+model CO2Record {
+  id          String   @id @default(cuid())
+  userId      String
+  journeyId   String?
+  mode        String
+  distanceKm  Float
+  co2Kg       Float    // actual CO2
+  savedVsCar  Float?   // CO2 saved compared to car
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  journey     Journey? @relation(fields: [journeyId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ==================== ACHIEVEMENTS ====================
+
+model Achievement {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String   // first_trip | eco_streak | carbon_saver | frequent_metro | etc
+  title       String
+  description String
+  badge       String?
+  earnedAt    DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model EcoStreak {
+  id           String   @id @default(cuid())
+  userId       String
+  currentDays  Int      @default(0)
+  longestDays  Int      @default(0)
+  lastEcoDate  DateTime?
+  totalCo2Saved Float   @default(0)
+  totalEcoTrips Int     @default(0)
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId])
+}
+
+// ==================== ANALYTICS ====================
+
+model UserAnalytics {
+  id               String   @id @default(cuid())
+  userId           String
+  month            Int
+  year             Int
+  totalTrips       Int      @default(0)
+  totalDistanceKm  Float    @default(0)
+  totalDurationMin Int      @default(0)
+  totalSpend       Float    @default(0)
+  totalCo2Kg       Float    @default(0)
+  co2SavedKg       Float    @default(0)
+  modeBreakdown    String?  // JSON: { Metro: X, Bus: Y, ... }
+  avgDailySpend    Float?
+  mostUsedMode     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, month, year])
+  @@index([userId])
+}
