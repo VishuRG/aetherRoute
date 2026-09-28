@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: aetherroute-frontend
+    runtime: node
+    plan: free
+    buildCommand: npm install --prefix frontend
+    startCommand: npm run dev:frontend
+    envVars:
+      - key: NODE_ENV
+        value: development
