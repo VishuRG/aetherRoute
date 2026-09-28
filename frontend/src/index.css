@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-main: #FFF8E7;
+    --card-surface: #FDFBF7;
+    --card-hover: #F8F1DE;
+    --border-color: #EADFC2;
+    --text-primary: #0E4D2F;
+    --text-muted: #577764;
+    --brand-forest: #1E7F4F;
+    --brand-deep: #0E4D2F;
+    --brand-mint: #3FBF7F;
+    --brand-sun: #FFC93C;
+    --brand-orange: #FF7A1A;
+    --brand-cream: #FFF8E7;
+    --brand-warm-cream: #F5EBD0;
+  }
+
+  .dark {
+    --bg-main: #0B1A13;
+    --card-surface: #14281E;
+    --card-hover: #1B3428;
+    --border-color: #203E2F;
+    --text-primary: #FFF8E7;
+    --text-muted: #9BB3A5;
+    --brand-forest: #3FBF7F;
+    --brand-deep: #1E7F4F;
+  }
+
+  html {
+    scroll-behavior: initial;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    overflow-x: hidden;
+  }
+}
+
+/* Glassmorphism Classes */
+.glass-panel {
+  background: rgba(253, 251, 247, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(234, 223, 194, 0.65);
+}
+
+.dark .glass-panel {
+  background: rgba(20, 40, 30, 0.78);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(32, 62, 47, 0.65);
+}
+
+.glass-nav {
+  background: rgba(255, 248, 231, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(234, 223, 194, 0.7);
+}
+
+.dark .glass-nav {
+  background: rgba(11, 26, 19, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(32, 62, 47, 0.7);
+}
+
+/* Topographic Contour Pattern in Hero */
+.topo-pattern {
+  background-image: radial-gradient(circle at 50% 50%, rgba(30, 127, 79, 0.08) 0%, transparent 65%),
+    url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 60 Q 30 30, 60 60 T 120 60' stroke='rgba(30,127,79,0.12)' fill='none' stroke-width='1.5'/%3E%3Cpath d='M0 90 Q 30 60, 60 90 T 120 90' stroke='rgba(30,127,79,0.08)' fill='none' stroke-width='1'/%3E%3Cpath d='M0 30 Q 30 0, 60 30 T 120 30' stroke='rgba(30,127,79,0.08)' fill='none' stroke-width='1'/%3E%3C/svg%3E");
+  background-size: cover, 120px 120px;
+}
+
+.dark .topo-pattern {
+  background-image: radial-gradient(circle at 50% 50%, rgba(63, 191, 127, 0.12) 0%, transparent 65%),
+    url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 60 Q 30 30, 60 60 T 120 60' stroke='rgba(63,191,127,0.15)' fill='none' stroke-width='1.5'/%3E%3Cpath d='M0 90 Q 30 60, 60 90 T 120 90' stroke='rgba(63,191,127,0.08)' fill='none' stroke-width='1'/%3E%3Cpath d='M0 30 Q 30 0, 60 30 T 120 30' stroke='rgba(63,191,127,0.08)' fill='none' stroke-width='1'/%3E%3C/svg%3E");
+  background-size: cover, 120px 120px;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+::-webkit-scrollbar-thumb {
+  background: #1E7F4F66;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #1E7F4F;
+}
+
+/* View Transitions Circular Reveal */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) {
+  z-index: 1;
+}
+::view-transition-new(root) {
+  z-index: 9999;
+}
+.dark::view-transition-old(root) {
+  z-index: 9999;
+}
+.dark::view-transition-new(root) {
+  z-index: 1;
+}
+
+/* MapLibre Attribution override */
+.maplibregl-ctrl-attrib {
+  font-size: 10px !important;
+  background: rgba(255, 248, 231, 0.8) !important;
+  color: #0E4D2F !important;
+  border-radius: 6px !important;
+  padding: 2px 6px !important;
+}
+.dark .maplibregl-ctrl-attrib {
+  background: rgba(20, 40, 30, 0.8) !important;
+  color: #FFF8E7 !important;
+}

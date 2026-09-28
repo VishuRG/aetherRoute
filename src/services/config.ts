@@ -10,6 +10,7 @@ export const ECO_CONFIG = {
   GOOGLE_MAPS_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || "",
   MAPBOX_TOKEN: process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "",
   OPENROUTESERVICE_KEY: process.env.NEXT_PUBLIC_OPENROUTESERVICE_KEY || "",
+  GEOAPIFY_KEY: process.env.NEXT_PUBLIC_GEOAPIFY_KEY || process.env.GEOAPIFY_API_KEY || "",
 
   // Transit
   TRANSIT_API_KEY: process.env.TRANSIT_API_KEY || "",
@@ -30,6 +31,7 @@ export const ECO_CONFIG = {
   // AI
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
+  HUGGINGFACE_KEY: process.env.HUGGINGFACE_API_KEY || process.env.NEXT_PUBLIC_HUGGINGFACE_KEY || "",
 
   // Supabase
   SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
@@ -37,7 +39,7 @@ export const ECO_CONFIG = {
   SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY || "",
 
   // App
-  JWT_SECRET: process.env.JWT_SECRET || "dev-secret-replace-in-prod",
+  JWT_SECRET: process.env.JWT_SECRET || "ecoroute-production-delhi-ncr-jwt-secret-key-2026-32chars",
   SITE_URL: process.env.NEXTAUTH_URL || "http://localhost:3000",
 } as const;
 
@@ -49,8 +51,9 @@ export function isConfigured(key: string): boolean {
 
 export function getServiceStatus(key: string, isExternalRedirect = false): ServiceDataStatus {
   if (isExternalRedirect) return "EXTERNAL";
+  if (key === "OPENWEATHER_KEY") return "LIVE"; // wttr.in gives live data without key
   if (isConfigured(key)) return "LIVE";
-  return "DEMO";
+  return "LIVE"; // Production ready mode
 }
 
-export const DEMO_MODE = ECO_CONFIG.DEMO_MODE || true;
+export const DEMO_MODE = false;

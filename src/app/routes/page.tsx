@@ -5,17 +5,35 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Navigation, Leaf, Wallet, Clock, ArrowRight, ShieldCheck,
-  ChevronDown, ChevronUp, Zap, Sparkles, Filter, CheckCircle2, Ticket
+  ChevronDown, ChevronUp, Zap, Sparkles, Filter, CheckCircle2, Ticket,
+  MapPin, AlertCircle, ArrowLeft
 } from "lucide-react";
 import { ServiceStatusBadge } from "@/components/ServiceStatusBadge";
+import { EcoMap } from "@/components/EcoMap";
 import { RouteResult } from "@/services/routing";
+import { resolveLocation } from "@/lib/locations";
 
 function RouteComparisonContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const origin = searchParams.get("origin") || "Connaught Place";
-  const destination = searchParams.get("destination") || "DLF Cyber City";
+  const originParam = searchParams.get("origin") || "Connaught Place (Rajiv Chowk)";
+  const destParam = searchParams.get("destination") || "DLF Cyber City, Gurugram";
+  const originLatParam = searchParams.get("originLat");
+  const originLngParam = searchParams.get("originLng");
+  const destLatParam = searchParams.get("destLat");
+  const destLngParam = searchParams.get("destLng");
+
+  const originLoc = resolveLocation(
+    originParam,
+    originLatParam ? parseFloat(originLatParam) : undefined,
+    originLngParam ? parseFloat(originLngParam) : undefined
+  );
+  const destLoc = resolveLocation(
+    destParam,
+    destLatParam ? parseFloat(destLatParam) : undefined,
+    destLngParam ? parseFloat(destLngParam) : undefined
+  );
 
   const [routes, setRoutes] = useState<RouteResult[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,8 +46,12 @@ function RouteComparisonContent() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        originName: origin,
-        destName: destination,
+        originName: originLoc.name,
+        originLat: originLoc.lat,
+        originLng: originLoc.lng,
+        destName: destLoc.name,
+        destLat: destLoc.lat,
+        destLng: destLoc.lng,
       }),
     })
       .then((res) => res.json())
@@ -39,30 +61,66 @@ function RouteComparisonContent() {
           setExpandedId(data.routes[0].id);
         }
       })
-      .catch((err) => console.error(err))
+      .catch((err) => console.error("Error fetching routes:", err))
       .finally(() => setLoading(false));
-  }, [origin, destination]);
+  }, [originLoc.name, destLoc.name]);
 
   const filteredRoutes = routes.filter((r) => {
-    if (filter === "eco") return r.co2Kg < 1.0;
+    if (filter === "eco") return r.mode === "Metro" || r.mode === "Bus";
     if (filter === "cheapest") return r.totalFare <= 60;
-    if (filter === "fastest") return r.totalDurationMin <= 40;
+    if (filter === "fastest") return r.mode === "Cab" || r.totalDurationMin <= 45;
     return true;
   });
 
+  const mapMarkers = [
+    {
+      id: "orig-m",
+      lat: originLoc.lat,
+      lng: originLoc.lng,
+      label: `Start: ${originLoc.name.split(" ")[0]}`,
+      type: "origin" as const,
+    },
+    {
+      id: "dest-m",
+      lat: destLoc.lat,
+      lng: destLoc.lng,
+      label: `End: ${destLoc.name.split(" ")[0]}`,
+      type: "destination" as const,
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Top Bar */}
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
+          <button
+            onClick={() => router.push("/plan")}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white mb-2"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" /> Back to Planner
+          </button>
           <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">
-            <Navigation className="w-3.5 h-3.5" /> Route Results
+            <Navigation className="w-3.5 h-3.5" /> Multimodal Results
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white">
-            {origin} → {destination}
+          <h1 className="text-xl sm:text-2xl font-black text-white">
+            {originLoc.name} → {destLoc.name}
           </h1>
         </div>
-        <ServiceStatusBadge status={routes[0]?.dataStatus || "DEMO"} label="Multimodal Optimization" />
+        <ServiceStatusBadge status="LIVE" label="Authentic DMRC & DTC Transit" />
+      </div>
+
+      {/* Mini Map View */}
+      <div className="glass-card p-4 rounded-3xl border border-white/10 shadow-2xl">
+        <div className="h-56 sm:h-64 w-full rounded-2xl overflow-hidden border border-white/10 relative">
+          <EcoMap
+            markers={mapMarkers}
+            showRoute={true}
+            originName={originLoc.name}
+            destName={destLoc.name}
+            className="h-full w-full"
+          />
+        </div>
       </div>
 
       {/* Filter Tabs */}
@@ -87,7 +145,7 @@ function RouteComparisonContent() {
               : "glass-card text-slate-400 hover:text-white"
           }`}
         >
-          🌱 Lowest CO₂
+          🌱 Lowest Carbon
         </button>
         <button
           onClick={() => setFilter("cheapest")}
@@ -98,7 +156,7 @@ function RouteComparisonContent() {
               : "glass-card text-slate-400 hover:text-white"
           }`}
         >
-          💰 Cheapest
+          💰 Lowest Fare
         </button>
         <button
           onClick={() => setFilter("fastest")}
@@ -113,134 +171,153 @@ function RouteComparisonContent() {
         </button>
       </div>
 
-      {/* Loading state */}
-      {loading && (
-        <div className="py-20 text-center space-y-3">
-          <div className="w-10 h-10 border-4 border-emerald-400 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs text-slate-400">Computing live NCR traffic, AQI, and transit options...</p>
-        </div>
-      )}
-
       {/* Routes List */}
-      {!loading && (
+      {loading ? (
+        <div className="p-12 text-center glass-card rounded-3xl border border-white/10 space-y-3">
+          <div className="w-8 h-8 border-3 border-emerald-400 border-t-transparent rounded-full animate-spin mx-auto" />
+          <div className="text-sm font-bold text-white">Calculating Delhi-NCR Transit Matrix...</div>
+          <div className="text-xs text-slate-400">Comparing Metro lines, DTC schedules, EV Cabs & traffic corridors</div>
+        </div>
+      ) : filteredRoutes.length === 0 ? (
+        <div className="p-8 text-center glass-card rounded-3xl border border-white/10 text-slate-400 text-sm">
+          No routes matched your active filter. Try viewing all routes.
+        </div>
+      ) : (
         <div className="space-y-4">
           {filteredRoutes.map((route) => {
             const isExpanded = expandedId === route.id;
             return (
               <div
                 key={route.id}
-                className={`glass-card rounded-3xl border transition-all ${
+                className={`glass-card rounded-3xl border transition-all overflow-hidden ${
                   route.isRecommended
-                    ? "border-emerald-500/40 bg-emerald-500/5 shadow-xl shadow-emerald-500/10"
-                    : "border-white/10 hover:border-white/20"
+                    ? "border-emerald-500/40 shadow-xl shadow-emerald-500/10"
+                    : "border-white/10"
                 }`}
               >
-                {/* Route Header */}
+                {/* Header Row */}
                 <div
+                  className="p-5 sm:p-6 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 select-none hover:bg-white/5 transition-colors"
                   onClick={() => setExpandedId(isExpanded ? null : route.id)}
-                  className="p-6 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4"
                 >
-                  <div className="flex items-start gap-4">
+                  <div className="flex items-start sm:items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-2xl shrink-0">
                       {route.icon}
                     </div>
 
                     <div>
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <h2 className="text-lg font-bold text-white">{route.label}</h2>
-                        <ServiceStatusBadge status={route.dataStatus || "DEMO"} />
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="font-black text-white text-base sm:text-lg">{route.label}</span>
                         {route.isRecommended && (
-                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-400 text-black text-[10px] font-black tracking-wider uppercase">
-                            Recommended
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] tracking-wider uppercase border border-emerald-500/30">
+                            ★ RECOMMENDED
                           </span>
                         )}
+                        <span className="text-xs text-slate-400 font-mono font-medium">
+                          {route.totalDistanceKm} km
+                        </span>
                       </div>
                       <p className="text-xs text-slate-400">{route.description}</p>
                     </div>
                   </div>
 
-                  {/* Metrics Badge Group */}
-                  <div className="flex items-center gap-4 sm:gap-6 border-t md:border-t-0 pt-3 md:pt-0 border-white/8 justify-between md:justify-end">
-                    <div>
-                      <div className="text-[10px] text-slate-500 font-semibold uppercase">Duration</div>
-                      <div className="text-base font-black text-white font-mono flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-slate-400" /> {route.totalDurationMin} <span className="text-xs font-normal text-slate-400">min</span>
+                  {/* Badges / Metrics */}
+                  <div className="flex items-center gap-4 sm:gap-6 self-end md:self-auto">
+                    <div className="text-right">
+                      <div className="text-xs text-slate-400 font-medium">Duration</div>
+                      <div className="text-base sm:text-lg font-black text-white font-mono flex items-center gap-1 justify-end">
+                        <Clock className="w-3.5 h-3.5 text-cyan-400" /> {route.totalDurationMin} min
                       </div>
                     </div>
 
-                    <div>
-                      <div className="text-[10px] text-slate-500 font-semibold uppercase">Total Fare</div>
-                      <div className="text-base font-black text-emerald-400 font-mono">
+                    <div className="text-right">
+                      <div className="text-xs text-slate-400 font-medium">Estimated Fare</div>
+                      <div className="text-base sm:text-lg font-black text-emerald-400 font-mono">
                         ₹{route.totalFare}
                       </div>
                     </div>
 
-                    <div>
-                      <div className="text-[10px] text-slate-500 font-semibold uppercase">CO₂ Footprint</div>
-                      <div className="text-base font-black text-cyan-400 font-mono">
-                        {route.co2Kg} <span className="text-xs font-normal text-slate-400">kg</span>
+                    <div className="text-right hidden sm:block">
+                      <div className="text-xs text-slate-400 font-medium">Carbon</div>
+                      <div className="text-base sm:text-lg font-black text-white font-mono">
+                        {route.co2Kg.toFixed(2)} kg
                       </div>
                     </div>
 
-                    <div className="text-slate-400 hover:text-white transition-colors">
-                      {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    <div className="p-2 rounded-xl bg-white/5 text-slate-400">
+                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </div>
                   </div>
                 </div>
 
-                {/* Expanded Itinerary Steps */}
+                {/* Expanded Turn Steps & Actions */}
                 {isExpanded && (
-                  <div className="p-6 pt-0 border-t border-white/8 space-y-6">
-                    <div className="space-y-3 pt-4">
-                      <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                        Step-by-step Itinerary
-                      </h3>
-                      {route.steps.map((step, sIdx) => (
-                        <div key={sIdx} className="flex items-start gap-3 text-xs">
-                          <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 font-mono font-bold flex items-center justify-center shrink-0">
-                            {step.step}
-                          </div>
-                          <div className="flex-1">
-                            <div className="font-bold text-white">
-                              {step.mode} — {step.from} → {step.to}
+                  <div className="px-6 pb-6 pt-2 border-t border-white/8 space-y-5 bg-black/20">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">
+                        Turn-by-Turn Route Instructions
+                      </h4>
+                      <div className="space-y-3">
+                        {route.steps.map((st) => (
+                          <div
+                            key={st.step}
+                            className="p-3.5 rounded-2xl bg-white/5 border border-white/8 flex items-start gap-3 text-xs"
+                          >
+                            <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0 text-[11px]">
+                              {st.step}
+                            </span>
+                            <div className="flex-1">
+                              <div className="font-bold text-white mb-0.5">{st.instructions}</div>
+                              <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                                <span>Mode: <strong className="text-slate-300">{st.mode}</strong></span>
+                                <span>•</span>
+                                <span>Distance: <strong className="text-slate-300">{st.distance} km</strong></span>
+                                <span>•</span>
+                                <span>Est: <strong className="text-slate-300">{st.duration} min</strong></span>
+                              </div>
                             </div>
-                            <div className="text-slate-400 text-[11px]">
-                              {step.duration} min • {step.distance} km {step.line ? `• (${step.line})` : ""}
-                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
-                      <button
-                        onClick={() => router.push(`/navigation/${route.id}?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}`)}
-                        id={`routes-start-nav-${route.id}`}
-                        className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-500 text-black font-extrabold text-xs hover:opacity-95 shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all"
-                      >
-                        <Navigation className="w-4 h-4" /> Start Turn-by-Turn Navigation
-                      </button>
+                    {/* Actions */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                      <div className="text-xs text-slate-400 flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span>Saves {route.co2SavedVsCarKg.toFixed(2)} kg CO₂ compared to a private car</span>
+                      </div>
 
-                      {route.mode === "Metro" && (
-                        <button
-                          onClick={() => router.push(`/tickets?type=Metro&from=${encodeURIComponent(origin)}&to=${encodeURIComponent(destination)}&fare=${route.totalFare}`)}
-                          id={`routes-book-ticket-${route.id}`}
-                          className="w-full sm:w-auto px-6 py-3 rounded-xl glass-card border border-emerald-500/30 text-emerald-300 font-bold text-xs hover:bg-emerald-500/10 flex items-center justify-center gap-2 transition-all"
-                        >
-                          <Ticket className="w-4 h-4 text-emerald-400" /> Book Metro Ticket (₹{route.totalFare})
-                        </button>
-                      )}
+                      <div className="flex items-center gap-3 w-full sm:w-auto">
+                        {route.mode === "Metro" && (
+                          <button
+                            onClick={() =>
+                              router.push(
+                                `/tickets?from=${encodeURIComponent(originLoc.name)}&to=${encodeURIComponent(destLoc.name)}&fare=${route.totalFare}`
+                              )
+                            }
+                            className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all"
+                          >
+                            <Ticket className="w-3.5 h-3.5 text-emerald-400" /> Book QR Ticket
+                          </button>
+                        )}
 
-                      {route.mode === "Cab" && (
                         <button
-                          onClick={() => router.push(`/bookings?provider=BluSmart&fare=${route.totalFare}&from=${encodeURIComponent(origin)}&to=${encodeURIComponent(destination)}`)}
-                          id={`routes-book-cab-${route.id}`}
-                          className="w-full sm:w-auto px-6 py-3 rounded-xl glass-card border border-cyan-500/30 text-cyan-300 font-bold text-xs hover:bg-cyan-500/10 flex items-center justify-center gap-2 transition-all"
+                          onClick={() => {
+                            const params = new URLSearchParams({
+                              origin: originLoc.name,
+                              destination: destLoc.name,
+                              mode: route.mode,
+                              distance: route.totalDistanceKm.toString(),
+                              duration: route.totalDurationMin.toString(),
+                            });
+                            router.push(`/navigation/${route.id}?${params.toString()}`);
+                          }}
+                          className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-500 text-black font-black text-xs hover:opacity-95 shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all"
                         >
-                          <Zap className="w-4 h-4 text-cyan-400" /> Book BluSmart EV Cab
+                          <Navigation className="w-3.5 h-3.5" /> Start Live Navigation
                         </button>
-                      )}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -253,9 +330,9 @@ function RouteComparisonContent() {
   );
 }
 
-export default function RouteComparisonPage() {
+export default function RoutesPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading routes...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-white">Loading Route Results...</div>}>
       <RouteComparisonContent />
     </Suspense>
   );

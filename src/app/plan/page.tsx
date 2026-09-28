@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   MapPin, Navigation, SlidersHorizontal, Clock, Zap, Leaf,
-  Bus, Car, Bike, Sparkles, Check, Accessibility
+  Bus, Car, Bike, Sparkles, Check, Accessibility, ArrowLeftRight
 } from "lucide-react";
 import { EcoMap } from "@/components/EcoMap";
 import { DemoBadge } from "@/components/DemoBadge";
-import { DEMO_DELHI_LOCATIONS } from "@/lib/demo-data";
+import { DELHI_NCR_LOCATIONS, resolveLocation } from "@/lib/locations";
+import { haversineDistance } from "@/lib/utils";
 
 export default function PlanJourneyPage() {
   const router = useRouter();
@@ -22,17 +23,54 @@ export default function PlanJourneyPage() {
 
   const toggleMode = (mode: string) => {
     if (selectedModes.includes(mode)) {
-      setSelectedModes(selectedModes.filter((m) => m !== mode));
+      if (selectedModes.length > 1) {
+        setSelectedModes(selectedModes.filter((m) => m !== mode));
+      }
     } else {
       setSelectedModes([...selectedModes, mode]);
     }
   };
 
+  const handleSwap = () => {
+    const temp = origin;
+    setOrigin(destination);
+    setDestination(temp);
+  };
+
+  const originLoc = resolveLocation(origin);
+  const destLoc = resolveLocation(destination);
+  const estDistanceKm = parseFloat(
+    (Math.max(1.8, haversineDistance(originLoc.lat, originLoc.lng, destLoc.lat, destLoc.lng)) * 1.2).toFixed(1)
+  );
+
+  const activeMarkers = [
+    {
+      id: "orig",
+      lat: originLoc.lat,
+      lng: originLoc.lng,
+      label: `Start: ${originLoc.name.split(" ")[0]}`,
+      title: originLoc.name,
+      type: "origin" as const,
+    },
+    {
+      id: "dest",
+      lat: destLoc.lat,
+      lng: destLoc.lng,
+      label: `End: ${destLoc.name.split(" ")[0]}`,
+      title: destLoc.name,
+      type: "destination" as const,
+    },
+  ];
+
   const handleCalculateRoutes = (e: React.FormEvent) => {
     e.preventDefault();
     const query = new URLSearchParams({
-      origin,
-      destination,
+      origin: originLoc.name,
+      originLat: originLoc.lat.toString(),
+      originLng: originLoc.lng.toString(),
+      destination: destLoc.name,
+      destLat: destLoc.lat.toString(),
+      destLng: destLoc.lng.toString(),
       maxWalking: maxWalking.toString(),
       preferEco: preferEco.toString(),
       wheelchair: wheelchair.toString(),
@@ -50,7 +88,7 @@ export default function PlanJourneyPage() {
             Multimodal Journey Planner <Sparkles className="w-5 h-5 text-emerald-400" />
           </h1>
           <p className="text-xs sm:text-sm text-slate-400">
-            Compare Metro, Bus, Cab & Auto routes optimized for Delhi-NCR emissions and traffic
+            Compare Metro, Bus, Cab & Auto routes with accurate GPS coordinates & authentic DMRC fares
           </p>
         </div>
         <DemoBadge message="Interactive NCR Route Planner" />
@@ -58,12 +96,12 @@ export default function PlanJourneyPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Planner Form */}
-        <div className="lg:col-span-2 glass-card p-6 rounded-3xl border border-white/10 space-y-6 shadow-2xl">
+        <div className="lg:col-span-2 glass-card p-6 sm:p-8 rounded-3xl border border-white/10 space-y-6 shadow-2xl">
           <form onSubmit={handleCalculateRoutes} className="space-y-6">
-            {/* Origin & Destination */}
-            <div className="space-y-4">
+            {/* Origin & Destination with Swap button */}
+            <div className="space-y-4 relative">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">
+                <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider">
                   Starting Point (Origin)
                 </label>
                 <div className="relative">
@@ -72,20 +110,31 @@ export default function PlanJourneyPage() {
                     value={origin}
                     onChange={(e) => setOrigin(e.target.value)}
                     id="plan-origin-select"
-                    className="eco-input pl-10 py-3.5 text-sm appearance-none cursor-pointer"
+                    className="eco-input pl-10 pr-4 py-3.5 text-xs sm:text-sm appearance-none cursor-pointer font-medium"
                   >
-                    {DEMO_DELHI_LOCATIONS.map((loc) => (
+                    {DELHI_NCR_LOCATIONS.map((loc) => (
                       <option key={loc.id} value={loc.name} className="bg-slate-900 text-white">
-                        📍 {loc.name} ({loc.type})
+                        📍 {loc.name} ({loc.zone})
                       </option>
                     ))}
                   </select>
                 </div>
               </div>
 
+              {/* Swap Button */}
+              <div className="flex justify-center -my-2">
+                <button
+                  type="button"
+                  onClick={handleSwap}
+                  className="px-3 py-1.5 rounded-full bg-slate-900 border border-emerald-500/40 text-emerald-400 text-xs font-semibold hover:bg-emerald-500 hover:text-black transition-all flex items-center gap-1.5 shadow-lg"
+                >
+                  <ArrowLeftRight className="w-3.5 h-3.5" /> Swap Origin & Destination
+                </button>
+              </div>
+
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">
-                  Destination
+                <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider">
+                  Destination Point
                 </label>
                 <div className="relative">
                   <Navigation className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-cyan-400" />
@@ -93,11 +142,11 @@ export default function PlanJourneyPage() {
                     value={destination}
                     onChange={(e) => setDestination(e.target.value)}
                     id="plan-dest-select"
-                    className="eco-input pl-10 py-3.5 text-sm appearance-none cursor-pointer"
+                    className="eco-input pl-10 pr-4 py-3.5 text-xs sm:text-sm appearance-none cursor-pointer font-medium"
                   >
-                    {DEMO_DELHI_LOCATIONS.map((loc) => (
+                    {DELHI_NCR_LOCATIONS.map((loc) => (
                       <option key={loc.id} value={loc.name} className="bg-slate-900 text-white">
-                        🎯 {loc.name} ({loc.type})
+                        🎯 {loc.name} ({loc.zone})
                       </option>
                     ))}
                   </select>
@@ -105,50 +154,51 @@ export default function PlanJourneyPage() {
               </div>
             </div>
 
-            {/* Allowed Modes Selectors */}
+            {/* Transport Modes Selectors */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-2 uppercase tracking-wider">
-                Select Transport Modes
+              <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
+                Select Allowed Transport Modes
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
                   { id: "Metro", label: "Delhi Metro", icon: "🚇" },
                   { id: "Bus", label: "DTC Bus", icon: "🚌" },
                   { id: "Cab", label: "Cab / EV", icon: "🚖" },
-                  { id: "Auto", label: "Auto Rickshaw", icon: "🛺" },
+                  { id: "Auto", label: "CNG Auto", icon: "🛺" },
                 ].map((mode) => {
                   const isSelected = selectedModes.includes(mode.id);
                   return (
                     <button
-                      type="button"
                       key={mode.id}
+                      type="button"
                       onClick={() => toggleMode(mode.id)}
-                      id={`plan-mode-${mode.id.toLowerCase()}`}
-                      className={`p-3 rounded-2xl border text-xs font-semibold flex items-center gap-2 transition-all ${
+                      className={`p-3.5 rounded-2xl border text-left transition-all flex items-center gap-3 ${
                         isSelected
-                          ? "bg-emerald-500/20 border-emerald-500/40 text-white"
-                          : "bg-white/5 border-white/8 text-slate-400 hover:text-white"
+                          ? "bg-emerald-500/15 border-emerald-500/50 text-white shadow-lg shadow-emerald-500/10"
+                          : "bg-white/5 border-white/5 text-slate-400 hover:border-white/10"
                       }`}
                     >
-                      <span className="text-base">{mode.icon}</span>
-                      <span>{mode.label}</span>
-                      {isSelected && <Check className="w-3.5 h-3.5 text-emerald-400 ml-auto" />}
+                      <span className="text-xl">{mode.icon}</span>
+                      <div>
+                        <div className="font-bold text-xs">{mode.label}</div>
+                        <div className="text-[10px] text-slate-400">{isSelected ? "Enabled" : "Off"}</div>
+                      </div>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Preferences Section */}
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/8 space-y-4">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-300">
-                <span className="flex items-center gap-1.5"><SlidersHorizontal className="w-4 h-4 text-emerald-400" /> Commute Preferences</span>
+            {/* Travel Preferences Sliders */}
+            <div className="p-5 rounded-2xl bg-white/5 border border-white/8 space-y-4">
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                <SlidersHorizontal className="w-4 h-4" /> Preferences & Constraints
               </div>
 
               <div>
-                <div className="flex justify-between items-center text-xs mb-2">
-                  <span className="text-slate-400">Max Walking Distance:</span>
-                  <span className="text-emerald-400 font-mono font-bold">{maxWalking} mins</span>
+                <div className="flex justify-between text-xs font-semibold mb-2">
+                  <span className="text-slate-300">Maximum Walking Tolerance:</span>
+                  <span className="text-emerald-400 font-mono">{maxWalking} minutes</span>
                 </div>
                 <input
                   type="range"
@@ -157,94 +207,68 @@ export default function PlanJourneyPage() {
                   step={5}
                   value={maxWalking}
                   onChange={(e) => setMaxWalking(Number(e.target.value))}
-                  id="plan-walking-slider"
                   className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-400"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setPreferEco(!preferEco)}
-                  id="plan-pref-eco"
-                  className={`p-2.5 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
-                    preferEco
-                      ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
-                      : "bg-white/5 border-white/8 text-slate-400"
-                  }`}
-                >
-                  <span className="flex items-center gap-1.5"><Leaf className="w-3.5 h-3.5" /> Lowest CO₂</span>
-                  <div className={`w-3.5 h-3.5 rounded-full ${preferEco ? "bg-emerald-400" : "bg-slate-700"}`} />
-                </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <label className="flex items-center gap-3 cursor-pointer text-xs text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={preferEco}
+                    onChange={(e) => setPreferEco(e.target.checked)}
+                    className="w-4 h-4 rounded bg-slate-800 border-white/20 text-emerald-400 focus:ring-0"
+                  />
+                  <span>Prioritize Lowest Emission Routes</span>
+                </label>
 
-                <button
-                  type="button"
-                  onClick={() => setAvoidTraffic(!avoidTraffic)}
-                  id="plan-pref-traffic"
-                  className={`p-2.5 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
-                    avoidTraffic
-                      ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-300"
-                      : "bg-white/5 border-white/8 text-slate-400"
-                  }`}
-                >
-                  <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5" /> Avoid Traffic</span>
-                  <div className={`w-3.5 h-3.5 rounded-full ${avoidTraffic ? "bg-cyan-400" : "bg-slate-700"}`} />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setWheelchair(!wheelchair)}
-                  id="plan-pref-wheelchair"
-                  className={`p-2.5 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
-                    wheelchair
-                      ? "bg-purple-500/20 border-purple-500/40 text-purple-300"
-                      : "bg-white/5 border-white/8 text-slate-400"
-                  }`}
-                >
-                  <span className="flex items-center gap-1.5"><Accessibility className="w-3.5 h-3.5" /> Wheelchair</span>
-                  <div className={`w-3.5 h-3.5 rounded-full ${wheelchair ? "bg-purple-400" : "bg-slate-700"}`} />
-                </button>
+                <label className="flex items-center gap-3 cursor-pointer text-xs text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={wheelchair}
+                    onChange={(e) => setWheelchair(e.target.checked)}
+                    className="w-4 h-4 rounded bg-slate-800 border-white/20 text-emerald-400 focus:ring-0"
+                  />
+                  <span>Wheelchair & Ramp Accessibility</span>
+                </label>
               </div>
             </div>
 
             <button
               type="submit"
               id="plan-submit-btn"
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-500 text-black font-extrabold text-base hover:opacity-95 shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5"
+              className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-500 text-black font-black text-base hover:opacity-95 shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-3 transition-all transform hover:-translate-y-0.5"
             >
-              Calculate Optimized Multimodal Routes
+              <Zap className="w-5 h-5" /> Calculate Optimized Routes
             </button>
           </form>
         </div>
 
-        {/* Map Preview & Details */}
+        {/* Live Vector Map & Distance Summary */}
         <div className="space-y-4">
-          <div className="glass-card p-4 rounded-3xl border border-white/10 space-y-3">
-            <div className="text-xs font-bold text-white uppercase tracking-wider">
-              Route Coordinates Map
+          <div className="glass-card p-4 rounded-3xl border border-white/10 space-y-3 shadow-2xl">
+            <div className="flex items-center justify-between px-2">
+              <span className="text-xs font-bold text-white uppercase tracking-wider">Live Route Preview</span>
+              <span className="text-xs font-mono font-bold text-emerald-400">~{estDistanceKm} km</span>
             </div>
-            <div className="h-64 w-full rounded-2xl overflow-hidden border border-white/10">
+
+            <div className="h-72 w-full rounded-2xl overflow-hidden border border-white/10">
               <EcoMap
-                center={{ lat: 28.5639, lng: 77.1543 }}
-                zoom={10}
-                markers={[
-                  { id: "org", position: { lat: 28.6328, lng: 77.2197 }, title: origin },
-                  { id: "dst", position: { lat: 28.4950, lng: 77.0889 }, title: destination },
-                ]}
+                markers={activeMarkers}
+                showRoute={true}
+                originName={originLoc.name}
+                destName={destLoc.name}
+                className="h-full w-full"
               />
             </div>
-            <div className="text-[11px] text-slate-400 px-1">
-              Estimated Distance: <strong className="text-slate-200">18.2 km</strong> (Connaught Place → Cyber City)
-            </div>
-          </div>
 
-          <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs space-y-2">
-            <div className="font-bold text-emerald-400 flex items-center gap-1.5">
-              <Leaf className="w-4 h-4" /> Eco Advice for this Corridor
+            <div className="p-3 rounded-xl bg-white/5 border border-white/8 text-xs text-slate-400 space-y-1">
+              <div>From: <strong className="text-white">{originLoc.name}</strong></div>
+              <div>To: <strong className="text-white">{destLoc.name}</strong></div>
+              <div className="text-[11px] text-emerald-400 pt-1 border-t border-white/8">
+                Estimated Transit Distance: <strong className="font-mono">{estDistanceKm} km</strong>
+              </div>
             </div>
-            <p className="text-slate-300 leading-relaxed">
-              Taking Delhi Metro (Yellow Line → Magenta Line) avoids heavy congestion on NH-48 and reduces your carbon footprint by 80% compared to a petrol cab.
-            </p>
           </div>
         </div>
       </div>

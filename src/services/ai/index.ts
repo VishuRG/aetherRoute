@@ -14,7 +14,53 @@ export async function generateAIResponse(
   prompt: string,
   context?: { origin?: string; destination?: string; currentMode?: string }
 ): Promise<AIChatMessage> {
-  // If Gemini API key is configured
+  // 1. Hugging Face Router API (Meta Llama 3.3 70B Instruct)
+  const hfKey = ECO_CONFIG.HUGGINGFACE_KEY;
+  if (hfKey) {
+    try {
+      const res = await fetch("https://router.huggingface.co/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${hfKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "meta-llama/Llama-3.3-70B-Instruct",
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are Aether AI, an expert journey planner and travel advisor for AetherRoute. Provide concise, friendly, and practical advice on travel destinations, multimodal route plans (EV charging, petrol pumps, tolls, metro), distances, times, and scenic detours. Format with clean bullet points.",
+            },
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          max_tokens: 350,
+          temperature: 0.7,
+        }),
+        signal: AbortSignal.timeout(12000),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const reply = data.choices?.[0]?.message?.content;
+        if (reply) {
+          return {
+            id: `ai_${Date.now()}`,
+            sender: "ai",
+            text: reply,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          };
+        }
+      }
+    } catch (e) {
+      console.warn("Hugging Face Router API error, using smart travel fallback:", e);
+    }
+  }
+
+  // 2. If Gemini API key is configured
   if (ECO_CONFIG.GEMINI_API_KEY && !DEMO_MODE) {
     try {
       const res = await fetch(

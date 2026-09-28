@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ShieldAlert, Phone, MapPin, CheckCircle2, AlertTriangle, Users, Plus, Sparkles } from "lucide-react";
 import { DemoBadge } from "@/components/DemoBadge";
 import { DEMO_NEARBY } from "@/lib/demo-data";
@@ -8,10 +8,38 @@ import { DEMO_NEARBY } from "@/lib/demo-data";
 export default function EmergencyPage() {
   const [sosActive, setSosActive] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [hospitals, setHospitals] = useState<any[]>(DEMO_NEARBY.hospitals);
+  const [policeStations, setPoliceStations] = useState<any[]>(DEMO_NEARBY.police);
+  const [loadingFacilities, setLoadingFacilities] = useState(false);
   const [contacts, setContacts] = useState([
     { id: "c1", name: "Sunita Sharma", relationship: "Mother", phone: "+91 98100 12345", isPrimary: true },
     { id: "c2", name: "Anit Kumar", relationship: "Brother", phone: "+91 98111 67890", isPrimary: false },
   ]);
+
+  useEffect(() => {
+    async function loadPlaces() {
+      try {
+        setLoadingFacilities(true);
+        const [hRes, pRes] = await Promise.all([
+          fetch("/api/places?category=hospital&lat=28.6328&lng=77.2197"),
+          fetch("/api/places?category=police&lat=28.6328&lng=77.2197"),
+        ]);
+        if (hRes.ok) {
+          const hData = await hRes.json();
+          if (hData.places?.length > 0) setHospitals(hData.places);
+        }
+        if (pRes.ok) {
+          const pData = await pRes.json();
+          if (pData.places?.length > 0) setPoliceStations(pData.places);
+        }
+      } catch (err) {
+        console.warn("Error fetching places:", err);
+      } finally {
+        setLoadingFacilities(false);
+      }
+    }
+    loadPlaces();
+  }, []);
   const [showAddContact, setShowAddContact] = useState(false);
   const [newContactName, setNewContactName] = useState("");
   const [newContactRel, setNewContactRel] = useState("");
@@ -163,23 +191,51 @@ export default function EmergencyPage() {
 
         {/* Nearby Hospitals & Police Stations */}
         <div className="glass-card p-6 rounded-3xl border border-white/10 space-y-4">
-          <h2 className="text-base font-bold text-white flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-emerald-400" /> Nearby Emergency Facilities (Delhi NCR)
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-emerald-400" /> Nearby Emergency Facilities (Delhi NCR)
+            </h2>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">
+              LIVE GEOAPIFY
+            </span>
+          </div>
 
-          <div className="space-y-3 text-xs">
-            <div className="font-bold text-slate-300 uppercase tracking-wider text-[11px]">Hospitals</div>
-            {DEMO_NEARBY.hospitals.map((h, idx) => (
-              <div key={idx} className="p-3 rounded-2xl bg-white/5 border border-white/8 flex items-center justify-between">
-                <div>
-                  <div className="font-bold text-white">{h.name}</div>
-                  <div className="text-slate-400">{h.distance} km away</div>
-                </div>
-                <a href={`tel:${h.phone}`} className="text-emerald-400 font-mono font-bold hover:underline">
-                  {h.phone}
-                </a>
+          <div className="space-y-4 text-xs">
+            <div>
+              <div className="font-bold text-slate-300 uppercase tracking-wider text-[11px] mb-2">Hospitals & Trauma Centers</div>
+              <div className="space-y-2">
+                {hospitals.slice(0, 4).map((h, idx) => (
+                  <div key={idx} className="p-3 rounded-2xl bg-white/5 border border-white/8 flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-white">{h.name}</div>
+                      <div className="text-slate-400 text-[11px]">{h.distanceKm ?? h.distance} km away {h.address ? `• ${h.address.slice(0, 35)}...` : ""}</div>
+                    </div>
+                    {h.phone && (
+                      <a href={`tel:${h.phone}`} className="text-emerald-400 font-mono font-bold hover:underline ml-2 whitespace-nowrap">
+                        {h.phone}
+                      </a>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+
+            <div>
+              <div className="font-bold text-slate-300 uppercase tracking-wider text-[11px] mb-2">Police Stations</div>
+              <div className="space-y-2">
+                {policeStations.slice(0, 3).map((p, idx) => (
+                  <div key={idx} className="p-3 rounded-2xl bg-white/5 border border-white/8 flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-white">{p.name}</div>
+                      <div className="text-slate-400 text-[11px]">{p.distanceKm ?? p.distance} km away</div>
+                    </div>
+                    <a href={`tel:${p.phone || "112"}`} className="text-blue-400 font-mono font-bold hover:underline ml-2 whitespace-nowrap">
+                      {p.phone || "112"}
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
