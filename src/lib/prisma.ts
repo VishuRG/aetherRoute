@@ -5,15 +5,32 @@ import path from "path";
 // In serverless environments (like Vercel), the deployment directory is read-only.
 // Copy SQLite database to /tmp/dev.db so write operations (auth, bookings, complaints) succeed.
 if (process.env.VERCEL) {
-  const tmpPath = "/tmp/dev.db";
-  const sourcePath = path.join(process.cwd(), "prisma", "dev.db");
-  try {
-    if (!fs.existsSync(tmpPath) && fs.existsSync(sourcePath)) {
-      fs.copyFileSync(sourcePath, tmpPath);
+  const isSqlite =
+    !process.env.DATABASE_URL || process.env.DATABASE_URL.startsWith("file:");
+
+  if (isSqlite) {
+    const tmpPath =
+      process.platform === "win32"
+        ? path.join(process.cwd(), ".next", "dev.db")
+        : "/tmp/dev.db";
+
+    try {
+      const dir = path.dirname(tmpPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
+      const sourcePath = path.join(process.cwd(), "prisma", "dev.db");
+      if (!fs.existsSync(/*turbopackIgnore: true*/ tmpPath) && fs.existsSync(/*turbopackIgnore: true*/ sourcePath)) {
+        fs.copyFileSync(sourcePath, tmpPath);
+      }
+
+      if (fs.existsSync(tmpPath)) {
+        process.env.DATABASE_URL = `file:${tmpPath}`;
+      }
+    } catch (err) {
+      console.error("Prisma Vercel /tmp initialization error:", err);
     }
-    process.env.DATABASE_URL = `file:${tmpPath}`;
-  } catch (err) {
-    console.error("Prisma Vercel /tmp initialization error:", err);
   }
 }
 
