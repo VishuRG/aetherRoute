@@ -10,7 +10,8 @@
     "build:frontend": "npm run build --prefix frontend",
     "build:all": "next build && npm run build --prefix frontend",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

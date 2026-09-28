@@ -20,6 +20,7 @@
 
 # prisma sqlite dev db
 prisma/*.db
+!prisma/dev.db
 prisma/*.db-journal
 
 # misc
