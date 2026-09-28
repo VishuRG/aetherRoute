@@ -2,6 +2,7 @@
 // Connects to the SQLite + Prisma backend with automatic client-side database persistence
 
 import { User } from "@/types";
+import { API_BASE_URL } from "@/config/api";
 
 export interface AuthResponse {
   success: boolean;
@@ -41,7 +42,7 @@ export const dbService = {
 
     // Attempt real SQL Database POST via backend proxy
     try {
-      const res = await fetch("/api/auth/register", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email: cleanEmail, password, mobile }),
@@ -93,7 +94,7 @@ export const dbService = {
 
     // Attempt real SQL Database authentication
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: cleanEmail, password }),
@@ -135,7 +136,7 @@ export const dbService = {
   async getSession(): Promise<{ user: User | null; token: string | null }> {
     // Check SQLite backend first
     try {
-      const res = await fetch("/api/auth/me");
+      const res = await fetch(`${API_BASE_URL}/api/auth/me`);
       if (res.ok) {
         const data = await res.json();
         if (data.user) {
@@ -160,7 +161,7 @@ export const dbService = {
   // 4. Logout & Clear Sessions
   async logout(): Promise<void> {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await fetch(`${API_BASE_URL}/api/auth/logout`, { method: "POST" });
     } catch (e) {}
     localStorage.removeItem(STORAGE_KEY_USER);
     localStorage.removeItem(STORAGE_KEY_TOKEN);

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAppStore } from "@/store/useAppStore";
+import { API_BASE_URL } from "@/config/api";
 
 interface ChatMessage {
   id: string;
@@ -78,7 +79,7 @@ export const AIChatbot: React.FC = () => {
 
     try {
       // 1. Call Hugging Face via our proxy / API endpoint
-      const res = await fetch("/api/ai", {
+      const res = await fetch(`${API_BASE_URL}/api/ai`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: query }),

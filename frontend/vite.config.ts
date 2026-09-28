@@ -20,7 +20,7 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       '/api': {
-        target: process.env.VITE_BACKEND_URL || 'http://localhost:3000',
+        target: process.env.VITE_BACKEND_URL || 'https://aetherroute-backend.vercel.app',
         changeOrigin: true,
       },
     },
@@ -29,5 +29,11 @@ export default defineConfig({
     host: true,
     port: process.env.PORT ? parseInt(process.env.PORT) : 5173,
     allowedHosts: true,
+    proxy: {
+      '/api': {
+        target: process.env.VITE_BACKEND_URL || 'https://aetherroute-backend.vercel.app',
+        changeOrigin: true,
+      },
+    },
   },
 });
